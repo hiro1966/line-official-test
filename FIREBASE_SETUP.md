@@ -11,7 +11,7 @@ Google Cloud Functions（Firebase Functions）でLINE Botをデプロイする�
 
 ## 📋 前提条件
 
-- Node.js 18以上
+- **Node.js 20以上**（18は2025年10月に廃止されました）
 - Firebase CLIインストール済み
 - Googleアカウント
 
@@ -21,6 +21,11 @@ Google Cloud Functions（Firebase Functions）でLINE Botをデプロイする�
 
 ```bash
 npm install -g firebase-tools
+```
+
+**注意**: Node.js 20以上が必要です。バージョン確認：
+```bash
+node --version  # v20.x.x 以上であることを確認
 ```
 
 ### 2. Firebaseにログイン
@@ -268,10 +273,25 @@ const token = functions.config().line.access_token;
 
 ### デプロイエラー
 
+#### Node.js 18 廃止エラー
+```
+Error: Runtime Node.js 18 was decommissioned on 2025-10-30
+```
+
+**解決方法:**
 ```bash
 # Node.jsバージョン確認
-node --version  # 18以上であること
+node --version  # v20.x.x 以上であること
 
+# Node.js 20をインストール（必要な場合）
+# macOS/Linux: nvm use 20
+# Windows: Node.js公式サイトからv20をダウンロード
+
+# functions/package.json の engines.node を "20" に変更済み
+```
+
+#### その他のエラー
+```bash
 # Firebase CLIを最新に更新
 npm install -g firebase-tools@latest
 
