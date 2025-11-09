@@ -2,6 +2,52 @@
 
 LINEの公式アカウントと連携し、QRコードを使ってユーザーIDと氏名を紐付けるシステムです。
 
+## 🔥 Firebase Functions版とExpress版
+
+このプロジェクトには2つの実装があります：
+
+### 1. **Firebase Functions版（推奨）** - サーバーレス
+- 📁 `functions/` ディレクトリ
+- ✅ サーバー管理不要
+- ✅ 自動スケーリング
+- ✅ 無料枠あり
+- 📖 セットアップ: [FIREBASE_SETUP.md](./FIREBASE_SETUP.md)
+
+### 2. **Express版** - 従来型サーバー
+- 📁 `config/`, `routes/`, `services/`, `server.js`
+- ✅ 独自サーバーで運用
+- ✅ カスタマイズ性が高い
+- 📖 セットアップ: 以下のREADME参照
+
+---
+
+## 🚀 クイックスタート（Firebase Functions版）
+
+```bash
+# 1. Firebase CLIインストール
+npm install -g firebase-tools
+
+# 2. ログイン
+firebase login
+
+# 3. プロジェクト設定
+firebase use --add
+
+# 4. 依存パッケージインストール
+cd functions && npm install
+
+# 5. LINE設定
+firebase functions:config:set line.access_token="YOUR_TOKEN"
+firebase functions:config:set line.secret="YOUR_SECRET"
+
+# 6. デプロイ
+cd .. && firebase deploy --only functions
+```
+
+詳細は [FIREBASE_SETUP.md](./FIREBASE_SETUP.md) を参照してください。
+
+---
+
 ## 🎯 機能
 
 - ✅ LINE公式アカウントの友達登録
