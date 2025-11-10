@@ -189,13 +189,34 @@ https://asia-northeast1-YOUR_PROJECT_ID.cloudfunctions.net/generateQr
 
 ### ログ確認
 
+**リアルタイムでログを監視:**
 ```bash
-# リアルタイムでログを表示
+# 全てのFunctionsのログを表示
+firebase functions:log
+
+# 特定のFunctionのみ
 firebase functions:log --only lineWebhook
 
 # 最新100件のログを表示
 firebase functions:log --limit 100
 ```
+
+**Firebase Consoleでログ確認:**
+1. [Firebase Console](https://console.firebase.google.com/) にアクセス
+2. プロジェクトを開く
+3. 左メニュー「Functions」→「ログ」タブ
+4. または Google Cloud Console で詳細ログを確認
+
+**ログの種類:**
+- `=== Webhook Received ===` - Webhook受信時の全データ
+- `👤 New follower` - 新規友達登録
+- `💬 Message received` - メッセージ受信
+- `📋 List command triggered` - リストコマンド実行
+- `🔙 Postback received` - ボタン押下
+- `🗑️ Delete action triggered` - 削除実行
+- `=== Register Request ===` - ID登録リクエスト
+- `✅ Successfully linked` - 登録成功
+- `❌ Error` - エラー発生
 
 ### 設定確認
 

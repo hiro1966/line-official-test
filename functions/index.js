@@ -25,6 +25,8 @@ class UserService {
    */
   static async linkUser(lineUserId, userId, userName) {
     try {
+      console.log("🔗 UserService.linkUser called:", {lineUserId, userId, userName});
+
       const timestamp = Date.now();
       const linkData = {
         userId: userId,
@@ -36,8 +38,11 @@ class UserService {
       const snapshot = await userRef.once("value");
       const userData = snapshot.val() || {linkedUsers: {}};
 
+      console.log("📊 Current user data:", JSON.stringify(userData, null, 2));
+
       // 既に同じuserIdが登録されているかチェック
       if (userData.linkedUsers && userData.linkedUsers[userId]) {
+        console.log("⚠️ User ID already exists:", userId);
         return {
           success: false,
           error: "このIDは既に登録されています",
@@ -49,14 +54,16 @@ class UserService {
       userData.linkedUsers[userId] = linkData;
       userData.lastUpdated = timestamp;
 
+      console.log("💾 Saving to database...");
       await userRef.set(userData);
+      console.log("✅ Successfully saved to database");
 
       return {
         success: true,
         data: linkData,
       };
     } catch (error) {
-      console.error("Error linking user:", error);
+      console.error("❌ Error linking user:", error);
       return {
         success: false,
         error: error.message,
@@ -69,20 +76,26 @@ class UserService {
    */
   static async getLinkedUsers(lineUserId) {
     try {
+      console.log("📖 UserService.getLinkedUsers called for:", lineUserId);
+
       const snapshot = await db.ref(`users/${lineUserId}`).once("value");
       const userData = snapshot.val();
 
       if (!userData || !userData.linkedUsers) {
+        console.log("ℹ️ No linked users found");
         return [];
       }
 
-      return Object.entries(userData.linkedUsers).map(([userId, data]) => ({
+      const linkedUsers = Object.entries(userData.linkedUsers).map(([userId, data]) => ({
         userId,
         userName: data.userName,
         linkedAt: data.linkedAt,
       }));
+
+      console.log("✅ Found", linkedUsers.length, "linked users");
+      return linkedUsers;
     } catch (error) {
-      console.error("Error getting linked users:", error);
+      console.error("❌ Error getting linked users:", error);
       return [];
     }
   }
@@ -92,12 +105,15 @@ class UserService {
    */
   static async unlinkUser(lineUserId, userId) {
     try {
+      console.log("🗑️ UserService.unlinkUser called:", {lineUserId, userId});
+
       await db.ref(`users/${lineUserId}/linkedUsers/${userId}`).remove();
       await db.ref(`users/${lineUserId}/lastUpdated`).set(Date.now());
 
+      console.log("✅ Successfully unlinked:", userId);
       return {success: true};
     } catch (error) {
-      console.error("Error unlinking user:", error);
+      console.error("❌ Error unlinking user:", error);
       return {
         success: false,
         error: error.message,
@@ -340,6 +356,12 @@ exports.lineWebhook = functions.region("asia-northeast1").https.onRequest(
       }
 
       try {
+        // 📝 受信した全データをログ出力
+        console.log("=== Webhook Received ===");
+        console.log("Headers:", JSON.stringify(req.headers, null, 2));
+        console.log("Body:", JSON.stringify(req.body, null, 2));
+        console.log("========================");
+
         const events = req.body.events;
 
         // 各イベントを処理
@@ -347,7 +369,7 @@ exports.lineWebhook = functions.region("asia-northeast1").https.onRequest(
 
         res.json({success: true});
       } catch (error) {
-        console.error("Webhook error:", error);
+        console.error("❌ Webhook error:", error);
         res.status(500).json({error: error.message});
       }
     },
@@ -357,8 +379,15 @@ exports.lineWebhook = functions.region("asia-northeast1").https.onRequest(
  * イベントハンドラー
  */
 async function handleEvent(event) {
+  // 📝 イベント詳細をログ出力
+  console.log("--- Event Handler ---");
+  console.log("Event Type:", event.type);
+  console.log("Event Data:", JSON.stringify(event, null, 2));
+  console.log("--------------------");
+
   // フォロー（友達追加）イベント
   if (event.type === "follow") {
+    console.log("👤 New follower:", event.source.userId);
     await MessageService.sendWelcomeMessage(event.source.userId);
     return;
   }
@@ -368,20 +397,26 @@ async function handleEvent(event) {
     const text = event.message.text.trim();
     const userId = event.source.userId;
 
+    console.log("💬 Message received:", text, "from:", userId);
+
     // 「リスト」コマンド
     if (text === "リスト" || text === "りすと" || text.toLowerCase() === "list") {
+      console.log("📋 List command triggered");
       const linkedUsers = await UserService.getLinkedUsers(userId);
+      console.log("📊 Found", linkedUsers.length, "linked users");
       await MessageService.sendUserList(userId, linkedUsers);
       return;
     }
 
     // 「ヘルプ」コマンド
     if (text === "ヘルプ" || text === "へるぷ" || text.toLowerCase() === "help") {
+      console.log("❓ Help command triggered");
       await MessageService.sendHelp(event.replyToken);
       return;
     }
 
     // その他のテキストメッセージには使い方を案内
+    console.log("ℹ️ Unknown command, sending help");
     await MessageService.sendHelp(event.replyToken);
     return;
   }
@@ -393,7 +428,11 @@ async function handleEvent(event) {
     const targetUserId = data.get("userId");
     const lineUserId = event.source.userId;
 
+    console.log("🔙 Postback received - Action:", action, "UserID:", targetUserId);
+
     if (action === "delete" && targetUserId) {
+      console.log("🗑️ Delete action triggered for:", targetUserId);
+
       // ユーザー情報を取得してから削除
       const linkedUsers = await UserService.getLinkedUsers(lineUserId);
       const targetUser = linkedUsers.find((u) => u.userId === targetUserId);
@@ -401,16 +440,21 @@ async function handleEvent(event) {
       const result = await UserService.unlinkUser(lineUserId, targetUserId);
 
       if (result.success) {
+        console.log("✅ Successfully deleted:", targetUserId);
         await MessageService.sendDeletionSuccess(
             lineUserId,
             targetUser ? targetUser.userName : targetUserId,
         );
       } else {
+        console.log("❌ Failed to delete:", targetUserId, "Error:", result.error);
         await MessageService.sendError(lineUserId, "削除に失敗しました。");
       }
       return;
     }
   }
+
+  // その他のイベント
+  console.log("⚠️ Unhandled event type:", event.type);
 }
 
 /**
@@ -419,33 +463,43 @@ async function handleEvent(event) {
 exports.register = functions.region("asia-northeast1").https.onRequest(
     async (req, res) => {
       try {
+        console.log("=== Register Request ===");
+        console.log("Query params:", JSON.stringify(req.query, null, 2));
+        console.log("========================");
+
         const {lineId, userId, userName} = req.query;
 
         // パラメータチェック
         if (!lineId || !userId || !userName) {
+          console.log("❌ Missing parameters");
           return res.status(400).send(generateErrorPage(
               "必要なパラメータが不足しています。<br>" +
             "正しいQRコードをご使用ください。",
           ));
         }
 
+        console.log("📝 Attempting to link:", {lineId, userId, userName});
+
         // データベースに登録
         const result = await UserService.linkUser(lineId, userId, userName);
 
         if (result.success) {
+          console.log("✅ Successfully linked:", userId, "to", lineId);
+
           // LINEに通知
           await MessageService.sendRegistrationSuccess(lineId, userId, userName);
 
           // 成功ページを表示
           return res.send(generateSuccessPage(userId, userName));
         } else {
+          console.log("❌ Failed to link:", result.error);
           // エラーページを表示
           return res.status(400).send(generateErrorPage(
               result.error || "登録中にエラーが発生しました。",
           ));
         }
       } catch (error) {
-        console.error("Registration error:", error);
+        console.error("❌ Registration error:", error);
         res.status(500).send(generateErrorPage(
             "サーバーでエラーが発生しました。<br>" +
           "しばらく経ってから再度お試しください。",
