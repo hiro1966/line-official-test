@@ -921,6 +921,369 @@ exports.generateQr = functions.region("asia-northeast1").https.onRequest(
     },
 );
 
+/**
+ * メッセージ送信ページ
+ */
+exports.sendMessage = functions.region("asia-northeast1").https.onRequest(
+    (req, res) => {
+      res.send(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>LINE メッセージ送信</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          max-width: 800px;
+          margin: 50px auto;
+          padding: 20px;
+          background: #f5f5f5;
+        }
+        .container {
+          background: white;
+          padding: 40px;
+          border-radius: 10px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+          color: #333;
+          border-bottom: 3px solid #06c755;
+          padding-bottom: 10px;
+        }
+        .form-group {
+          margin: 20px 0;
+        }
+        label {
+          display: block;
+          font-weight: bold;
+          margin-bottom: 5px;
+          color: #555;
+        }
+        input, textarea {
+          width: 100%;
+          padding: 12px;
+          border: 2px solid #ddd;
+          border-radius: 5px;
+          font-size: 16px;
+          box-sizing: border-box;
+          font-family: inherit;
+        }
+        textarea {
+          min-height: 150px;
+          resize: vertical;
+        }
+        input:focus, textarea:focus {
+          outline: none;
+          border-color: #06c755;
+        }
+        button {
+          background: #06c755;
+          color: white;
+          padding: 15px 30px;
+          border: none;
+          border-radius: 5px;
+          font-size: 16px;
+          font-weight: bold;
+          cursor: pointer;
+          width: 100%;
+          margin-top: 10px;
+        }
+        button:hover {
+          background: #05b048;
+        }
+        button:disabled {
+          background: #ccc;
+          cursor: not-allowed;
+        }
+        .note {
+          background: #e3f2fd;
+          border-left: 4px solid #2196f3;
+          padding: 15px;
+          margin: 20px 0;
+          border-radius: 5px;
+        }
+        .note h3 {
+          margin-top: 0;
+          color: #1976d2;
+        }
+        #result {
+          margin-top: 20px;
+          padding: 15px;
+          border-radius: 5px;
+          display: none;
+        }
+        #result.success {
+          background: #d4edda;
+          border: 1px solid #c3e6cb;
+          color: #155724;
+          display: block;
+        }
+        #result.error {
+          background: #f8d7da;
+          border: 1px solid #f5c6cb;
+          color: #721c24;
+          display: block;
+        }
+        .loading {
+          display: none;
+          text-align: center;
+          margin: 20px 0;
+        }
+        .loading.show {
+          display: block;
+        }
+        .spinner {
+          border: 4px solid #f3f3f3;
+          border-top: 4px solid #06c755;
+          border-radius: 50%;
+          width: 40px;
+          height: 40px;
+          animation: spin 1s linear infinite;
+          margin: 0 auto;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>📨 LINE メッセージ送信</h1>
+        
+        <div class="note">
+          <h3>💡 使い方</h3>
+          <p>登録されているユーザーIDに対して、LINEメッセージを送信できます。</p>
+          <p>複数のユーザーに同時送信する場合は、カンマ区切りで入力してください（例: EMP001,EMP002,EMP003）</p>
+        </div>
+
+        <form id="messageForm">
+          <div class="form-group">
+            <label for="userIds">登録ID *</label>
+            <input 
+              type="text" 
+              id="userIds" 
+              name="userIds" 
+              placeholder="例: EMP001 または EMP001,EMP002,EMP003"
+              required
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="message">送信メッセージ *</label>
+            <textarea 
+              id="message" 
+              name="message" 
+              placeholder="送信するメッセージを入力してください"
+              required
+            ></textarea>
+          </div>
+
+          <button type="submit" id="submitBtn">送信</button>
+        </form>
+
+        <div class="loading" id="loading">
+          <div class="spinner"></div>
+          <p>送信中...</p>
+        </div>
+
+        <div id="result"></div>
+      </div>
+
+      <script>
+        const form = document.getElementById('messageForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          
+          const userIds = document.getElementById('userIds').value.trim();
+          const message = document.getElementById('message').value.trim();
+
+          if (!userIds || !message) {
+            showResult('全ての項目を入力してください', 'error');
+            return;
+          }
+
+          // 送信中表示
+          submitBtn.disabled = true;
+          loading.classList.add('show');
+          result.style.display = 'none';
+
+          try {
+            const response = await fetch('/sendMessageApi', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                userIds: userIds,
+                message: message,
+              }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+              showResult(
+                \`✅ 送信完了\\n\\n\${data.summary}\\n\\n送信先: \${data.sentTo.join(', ')}\`,
+                'success'
+              );
+              form.reset();
+            } else {
+              showResult(
+                \`❌ 送信失敗\\n\\n\${data.error || 'エラーが発生しました'}\`,
+                'error'
+              );
+            }
+          } catch (error) {
+            console.error('送信エラー:', error);
+            showResult('❌ 通信エラーが発生しました', 'error');
+          } finally {
+            submitBtn.disabled = false;
+            loading.classList.remove('show');
+          }
+        });
+
+        function showResult(message, type) {
+          result.textContent = message;
+          result.className = type;
+          result.style.display = 'block';
+        }
+      </script>
+    </body>
+    </html>
+  `);
+    },
+);
+
+/**
+ * メッセージ送信API
+ */
+exports.sendMessageApi = functions.region("asia-northeast1").https.onRequest(
+    async (req, res) => {
+      // CORSヘッダー設定
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type");
+
+      // プリフライトリクエスト対応
+      if (req.method === "OPTIONS") {
+        return res.status(204).send("");
+      }
+
+      // POST以外は拒否
+      if (req.method !== "POST") {
+        return res.status(405).json({
+          success: false,
+          error: "Method Not Allowed",
+        });
+      }
+
+      try {
+        const {userIds, message} = req.body;
+
+        console.log("=== Send Message API Called ===");
+        console.log("User IDs:", userIds);
+        console.log("Message:", message);
+        console.log("===============================");
+
+        // パラメータチェック
+        if (!userIds || !message) {
+          return res.status(400).json({
+            success: false,
+            error: "登録IDとメッセージは必須です",
+          });
+        }
+
+        // カンマ区切りでユーザーIDを分割
+        const userIdArray = userIds.split(",").map((id) => id.trim()).filter((id) => id);
+
+        if (userIdArray.length === 0) {
+          return res.status(400).json({
+            success: false,
+            error: "有効な登録IDを入力してください",
+          });
+        }
+
+        console.log("📋 Processing", userIdArray.length, "user IDs");
+
+        // 全ユーザーのLINE User IDを取得
+        const allUsers = await getAllUsers();
+        const sentTo = [];
+        const notFound = [];
+
+        for (const userId of userIdArray) {
+          console.log("🔍 Looking for userId:", userId);
+
+          let found = false;
+          for (const [lineUserId, userData] of Object.entries(allUsers)) {
+            if (userData.linkedUsers && userData.linkedUsers[userId]) {
+              // LINE User IDにメッセージ送信
+              try {
+                await client.pushMessage({
+                  to: lineUserId,
+                  messages: [{
+                    type: "text",
+                    text: message,
+                  }],
+                });
+                sentTo.push(userId);
+                found = true;
+                console.log("✅ Message sent to:", userId, "(LINE ID:", lineUserId, ")");
+                break;
+              } catch (error) {
+                console.error("❌ Failed to send to:", userId, error);
+              }
+            }
+          }
+
+          if (!found) {
+            notFound.push(userId);
+            console.log("⚠️ User not found:", userId);
+          }
+        }
+
+        // 結果を返す
+        let summary = `送信成功: ${sentTo.length}件`;
+        if (notFound.length > 0) {
+          summary += `\n見つからない: ${notFound.length}件 (${notFound.join(", ")})`;
+        }
+
+        return res.json({
+          success: true,
+          summary: summary,
+          sentTo: sentTo,
+          notFound: notFound,
+          total: userIdArray.length,
+        });
+      } catch (error) {
+        console.error("❌ Send message API error:", error);
+        return res.status(500).json({
+          success: false,
+          error: "サーバーエラーが発生しました: " + error.message,
+        });
+      }
+    },
+);
+
+/**
+ * 全ユーザーデータを取得
+ */
+async function getAllUsers() {
+  try {
+    const snapshot = await db.ref("users").once("value");
+    return snapshot.val() || {};
+  } catch (error) {
+    console.error("Error getting all users:", error);
+    return {};
+  }
+}
+
 // ============================================
 // HTMLテンプレート生成関数
 // ============================================

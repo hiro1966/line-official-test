@@ -132,11 +132,20 @@ firebase deploy --only functions
 ✔  functions[lineWebhook(asia-northeast1)]: Successful create operation.
 Function URL (lineWebhook): https://asia-northeast1-YOUR_PROJECT_ID.cloudfunctions.net/lineWebhook
 
+✔  functions[link(asia-northeast1)]: Successful create operation.
+Function URL (link): https://asia-northeast1-YOUR_PROJECT_ID.cloudfunctions.net/link
+
 ✔  functions[register(asia-northeast1)]: Successful create operation.
 Function URL (register): https://asia-northeast1-YOUR_PROJECT_ID.cloudfunctions.net/register
 
 ✔  functions[generateQr(asia-northeast1)]: Successful create operation.
 Function URL (generateQr): https://asia-northeast1-YOUR_PROJECT_ID.cloudfunctions.net/generateQr
+
+✔  functions[sendMessage(asia-northeast1)]: Successful create operation.
+Function URL (sendMessage): https://asia-northeast1-YOUR_PROJECT_ID.cloudfunctions.net/sendMessage
+
+✔  functions[sendMessageApi(asia-northeast1)]: Successful create operation.
+Function URL (sendMessageApi): https://asia-northeast1-YOUR_PROJECT_ID.cloudfunctions.net/sendMessageApi
 ```
 
 ### 10. LINE Developers設定
@@ -159,6 +168,13 @@ Function URL (generateQr): https://asia-northeast1-YOUR_PROJECT_ID.cloudfunction
 https://asia-northeast1-YOUR_PROJECT_ID.cloudfunctions.net/generateQr
 ```
 
+#### メッセージ送信ツールにアクセス
+
+ブラウザで以下のURLを開く：
+```
+https://asia-northeast1-YOUR_PROJECT_ID.cloudfunctions.net/sendMessage
+```
+
 #### LINE Botをテスト
 
 1. LINE公式アカウントを友達追加
@@ -166,6 +182,7 @@ https://asia-northeast1-YOUR_PROJECT_ID.cloudfunctions.net/generateQr
 3. QRコード生成ツールでQRコードを作成
 4. QRコードを読み取って登録
 5. 「リスト」と送信して登録されたIDを確認
+6. メッセージ送信ツールでメッセージを送信してテスト
 
 ## 📊 料金について
 
