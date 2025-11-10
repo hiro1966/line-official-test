@@ -39,10 +39,13 @@ cd functions && npm install
 # 5. LINE設定
 firebase functions:config:set line.access_token="YOUR_TOKEN"
 firebase functions:config:set line.secret="YOUR_SECRET"
+firebase functions:config:set line.basic_id="abc123def"
 
 # 6. デプロイ
 cd .. && firebase deploy --only functions
 ```
+
+**重要**: LINE Bot Basic IDの設定が必須です。`@`マークを除いた値を設定してください。
 
 詳細は [FIREBASE_SETUP.md](./FIREBASE_SETUP.md) を参照してください。
 
@@ -70,9 +73,13 @@ cd .. && firebase deploy --only functions
 ```
 ユーザー → ID紐付け用QRコード読み取り
        ↓
-  登録用URL（パラメータ付き）にアクセス
+  LINE公式アカウントのトークが開く
        ↓
-  Firebase Databaseに保存
+  「登録:ID:氏名」メッセージが事前入力される
+       ↓
+  ユーザーが送信ボタンをタップ
+       ↓
+  Webhookで自動処理・Firebase Databaseに保存
        ↓
   LINEに登録完了通知
 ```

@@ -102,16 +102,27 @@ firebase functions:config:set line.access_token="YOUR_CHANNEL_ACCESS_TOKEN"
 # LINE Channel Secret を設定
 firebase functions:config:set line.secret="YOUR_CHANNEL_SECRET"
 
+# LINE Bot Basic ID を設定（@マークは不要）
+firebase functions:config:set line.basic_id="abc123def"
+
 # 設定確認
 firebase functions:config:get
 ```
+
+**LINE Bot Basic IDの確認方法:**
+1. [LINE Developers Console](https://developers.line.biz/console/) にアクセス
+2. チャネルを開く
+3. 「Messaging API設定」タブを選択
+4. 「Bot basic ID」の値をコピー（例: @abc123def）
+5. **@マークを除いた部分**を設定（例: abc123def）
 
 **出力例:**
 ```json
 {
   "line": {
     "access_token": "xxx",
-    "secret": "xxx"
+    "secret": "xxx",
+    "basic_id": "abc123def"
   }
 }
 ```

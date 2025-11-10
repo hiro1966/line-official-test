@@ -478,7 +478,8 @@ async function handleEvent(event) {
 }
 
 /**
- * QRコード読み取り後のリンクページ（LINEメッセージ送信を促す）
+ * QRコード読み取り後のリンクページ（旧バージョン・互換性維持）
+ * 注: 現在はQRコードが直接LINE公式アカウントを開くため、この関数は使用されません
  */
 exports.link = functions.region("asia-northeast1").https.onRequest(
     async (req, res) => {
@@ -692,7 +693,9 @@ exports.register = functions.region("asia-northeast1").https.onRequest(
  */
 exports.generateQr = functions.region("asia-northeast1").https.onRequest(
     (req, res) => {
-      const functionUrl = `https://asia-northeast1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/link`;
+      // LINE公式アカウントのベーシックIDを取得（環境変数から）
+      // 例: @abc123def → abc123def
+      const lineBasicId = functions.config().line?.basic_id || "YOUR_LINE_BASIC_ID";
 
       res.send(`
     <!DOCTYPE html>
@@ -812,8 +815,18 @@ exports.generateQr = functions.region("asia-northeast1").https.onRequest(
         <div class="note">
           <h3>💡 使い方</h3>
           <p>1. 登録IDと氏名を入力してQRコードを生成</p>
-          <p>2. ユーザーがQRコードを読み取り、LINEでメッセージを送信</p>
-          <p>3. 自動的にLINEアカウントとIDが紐付けられます</p>
+          <p>2. ユーザーがQRコードを読み取ると、LINE公式アカウントのトークが開きます</p>
+          <p>3. 登録メッセージが自動で入力された状態になります（ユーザーが送信ボタンを押す）</p>
+          <p>4. 自動的にLINEアカウントとIDが紐付けられます</p>
+        </div>
+
+        <div class="note" style="background: #e3f2fd; border-left-color: #2196f3;">
+          <h3>⚙️ 設定が必要</h3>
+          <p>LINE公式アカウントのベーシックIDを設定してください：</p>
+          <code>firebase functions:config:set line.basic_id="abc123def"</code>
+          <p style="margin-top: 10px; font-size: 12px; color: #666;">
+            ※ @マークは不要です。LINE Developers Consoleの「Messaging API設定」→「Bot basic ID」から確認できます。
+          </p>
         </div>
 
         <form id="qrForm">
@@ -855,7 +868,7 @@ exports.generateQr = functions.region("asia-northeast1").https.onRequest(
         const form = document.getElementById('qrForm');
         const qrcodeDiv = document.getElementById('qrcode');
         const urlDisplay = document.getElementById('urlDisplay');
-        const baseUrl = '${functionUrl}';
+        const lineBasicId = '${lineBasicId}';
         let qrCodeInstance = null;
 
         form.addEventListener('submit', (e) => {
@@ -869,10 +882,10 @@ exports.generateQr = functions.region("asia-northeast1").https.onRequest(
             return;
           }
 
-          // URL生成
-          const url = baseUrl + '?' + 
-            'userId=' + encodeURIComponent(userId) +
-            '&userName=' + encodeURIComponent(userName);
+          // LINE公式アカウントのトークルームを開き、メッセージを事前入力
+          // フォーマット: https://line.me/R/oaMessage/@BASIC_ID/?MESSAGE
+          const message = \`登録:\${userId}:\${userName}\`;
+          const url = \`https://line.me/R/oaMessage/@\${lineBasicId}/?登録:\${encodeURIComponent(userId)}:\${encodeURIComponent(userName)}\`;
 
           // 既存のQRコードをクリア
           const canvas = document.getElementById('canvas');
@@ -891,7 +904,10 @@ exports.generateQr = functions.region("asia-northeast1").https.onRequest(
               correctLevel: QRCode.CorrectLevel.H
             });
 
-            urlDisplay.textContent = url;
+            urlDisplay.innerHTML = \`
+              <strong>登録メッセージ:</strong> \${message}<br>
+              <strong>LINE URL:</strong> \${url}
+            \`;
             qrcodeDiv.classList.add('show');
           } catch (error) {
             console.error('QRコード生成エラー:', error);
