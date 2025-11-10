@@ -395,16 +395,36 @@ async function handleEvent(event) {
   // メッセージイベント
   if (event.type === "message" && event.message.type === "text") {
     const text = event.message.text.trim();
-    const userId = event.source.userId;
+    const lineUserId = event.source.userId;
 
-    console.log("💬 Message received:", text, "from:", userId);
+    console.log("💬 Message received:", text, "from:", lineUserId);
+
+    // 「登録:ID:氏名」形式のメッセージ（QRコードからの登録）
+    if (text.startsWith("登録:")) {
+      const parts = text.split(":");
+      if (parts.length === 3) {
+        const userId = parts[1].trim();
+        const userName = parts[2].trim();
+
+        console.log("📝 Registration message detected:", {userId, userName});
+
+        const result = await UserService.linkUser(lineUserId, userId, userName);
+
+        if (result.success) {
+          await MessageService.sendRegistrationSuccess(lineUserId, userId, userName);
+        } else {
+          await MessageService.sendError(lineUserId, result.error);
+        }
+        return;
+      }
+    }
 
     // 「リスト」コマンド
     if (text === "リスト" || text === "りすと" || text.toLowerCase() === "list") {
       console.log("📋 List command triggered");
-      const linkedUsers = await UserService.getLinkedUsers(userId);
+      const linkedUsers = await UserService.getLinkedUsers(lineUserId);
       console.log("📊 Found", linkedUsers.length, "linked users");
-      await MessageService.sendUserList(userId, linkedUsers);
+      await MessageService.sendUserList(lineUserId, linkedUsers);
       return;
     }
 
@@ -458,7 +478,166 @@ async function handleEvent(event) {
 }
 
 /**
- * ID紐付け用エンドポイント
+ * QRコード読み取り後のリンクページ（LINEメッセージ送信を促す）
+ */
+exports.link = functions.region("asia-northeast1").https.onRequest(
+    async (req, res) => {
+      try {
+        const {userId, userName} = req.query;
+
+        console.log("=== Link Page Accessed ===");
+        console.log("Query params:", JSON.stringify(req.query, null, 2));
+        console.log("=========================");
+
+        // パラメータチェック
+        if (!userId || !userName) {
+          return res.status(400).send(generateErrorPage(
+              "必要なパラメータが不足しています。<br>" +
+            "正しいQRコードをご使用ください。",
+          ));
+        }
+
+        // LINEトークを開くURL（登録コードを自動入力）
+        const lineUrl = `https://line.me/R/oaMessage/@YOUR_LINE_ID/?登録:${userId}:${userName}`;
+
+        // リンクページを表示
+        return res.send(`
+          <!DOCTYPE html>
+          <html lang="ja">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>LINE登録</title>
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                margin: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              }
+              .container {
+                background: white;
+                padding: 40px;
+                border-radius: 20px;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                text-align: center;
+                max-width: 400px;
+              }
+              h1 {
+                color: #333;
+                margin: 0 0 20px 0;
+              }
+              .info {
+                background: #f8f9fa;
+                padding: 20px;
+                border-radius: 10px;
+                margin: 20px 0;
+                text-align: left;
+              }
+              .info-row {
+                display: flex;
+                margin: 10px 0;
+                font-size: 14px;
+              }
+              .info-label {
+                font-weight: bold;
+                color: #666;
+                min-width: 50px;
+              }
+              .info-value {
+                color: #333;
+                word-break: break-all;
+              }
+              .instructions {
+                background: #e3f2fd;
+                border-left: 4px solid #2196f3;
+                padding: 15px;
+                margin: 20px 0;
+                text-align: left;
+                border-radius: 5px;
+              }
+              .instructions ol {
+                margin: 10px 0;
+                padding-left: 20px;
+              }
+              .instructions li {
+                margin: 8px 0;
+                line-height: 1.6;
+              }
+              .code-display {
+                background: #f5f5f5;
+                padding: 15px;
+                border-radius: 5px;
+                font-family: monospace;
+                font-size: 18px;
+                font-weight: bold;
+                color: #06c755;
+                margin: 20px 0;
+                border: 2px dashed #06c755;
+              }
+              .line-button {
+                display: inline-block;
+                background: #06c755;
+                color: white;
+                padding: 15px 40px;
+                border-radius: 25px;
+                text-decoration: none;
+                margin-top: 20px;
+                font-weight: bold;
+                font-size: 18px;
+              }
+              .line-button:hover {
+                background: #05b048;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>📱 LINE登録</h1>
+              <div class="info">
+                <div class="info-row">
+                  <span class="info-label">ID:</span>
+                  <span class="info-value">${userId}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">氏名:</span>
+                  <span class="info-value">${userName}</span>
+                </div>
+              </div>
+              
+              <div class="instructions">
+                <strong>📝 登録手順:</strong>
+                <ol>
+                  <li>まず、LINE公式アカウントを友達追加</li>
+                  <li>下のボタンをタップしてLINEを開く</li>
+                  <li>以下のコードをコピーして送信:</li>
+                </ol>
+              </div>
+
+              <div class="code-display">
+                登録:${userId}:${userName}
+              </div>
+
+              <a href="https://line.me/R/" class="line-button">LINEを開く</a>
+            </div>
+          </body>
+          </html>
+        `);
+      } catch (error) {
+        console.error("❌ Link page error:", error);
+        res.status(500).send(generateErrorPage(
+            "サーバーでエラーが発生しました。<br>" +
+          "しばらく経ってから再度お試しください。",
+        ));
+      }
+    },
+);
+
+/**
+ * ID紐付け用エンドポイント（旧バージョン・互換性維持）
  */
 exports.register = functions.region("asia-northeast1").https.onRequest(
     async (req, res) => {
@@ -513,7 +692,7 @@ exports.register = functions.region("asia-northeast1").https.onRequest(
  */
 exports.generateQr = functions.region("asia-northeast1").https.onRequest(
     (req, res) => {
-      const functionUrl = `https://asia-northeast1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/register`;
+      const functionUrl = `https://asia-northeast1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/link`;
 
       res.send(`
     <!DOCTYPE html>
@@ -522,7 +701,6 @@ exports.generateQr = functions.region("asia-northeast1").https.onRequest(
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>QRコード生成ツール</title>
-      <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
       <style>
         body {
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -589,8 +767,13 @@ exports.generateQr = functions.region("asia-northeast1").https.onRequest(
         #qrcode.show {
           display: block;
         }
-        #qrcode canvas {
+        #canvas {
           margin: 20px auto;
+          display: flex;
+          justify-content: center;
+        }
+        #canvas canvas,
+        #canvas img {
           display: block;
         }
         .url-display {
@@ -627,23 +810,13 @@ exports.generateQr = functions.region("asia-northeast1").https.onRequest(
         <h1>📱 LINE ID紐付け用QRコード生成</h1>
         
         <div class="note">
-          <h3>⚠️ 重要</h3>
-          <p>このツールで生成されたQRコードを読み取ると、指定したIDと氏名がLINEアカウントに紐付けられます。</p>
-          <p><strong>LINE User ID</strong>は、ユーザーが友達登録した際にWebhookで取得できます。</p>
+          <h3>💡 使い方</h3>
+          <p>1. 登録IDと氏名を入力してQRコードを生成</p>
+          <p>2. ユーザーがQRコードを読み取り、LINEでメッセージを送信</p>
+          <p>3. 自動的にLINEアカウントとIDが紐付けられます</p>
         </div>
 
         <form id="qrForm">
-          <div class="form-group">
-            <label for="lineId">LINE User ID *</label>
-            <input 
-              type="text" 
-              id="lineId" 
-              name="lineId" 
-              placeholder="例: U1234567890abcdef1234567890abcdef"
-              required
-            >
-          </div>
-
           <div class="form-group">
             <label for="userId">登録ID *</label>
             <input 
@@ -671,63 +844,74 @@ exports.generateQr = functions.region("asia-northeast1").https.onRequest(
 
         <div id="qrcode">
           <h2>生成されたQRコード</h2>
-          <canvas id="canvas"></canvas>
+          <div id="canvas"></div>
           <div class="url-display" id="urlDisplay"></div>
           <button class="download-btn" onclick="downloadQR()">QRコードをダウンロード</button>
         </div>
       </div>
 
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
       <script>
         const form = document.getElementById('qrForm');
         const qrcodeDiv = document.getElementById('qrcode');
-        const canvas = document.getElementById('canvas');
         const urlDisplay = document.getElementById('urlDisplay');
         const baseUrl = '${functionUrl}';
+        let qrCodeInstance = null;
 
-        form.addEventListener('submit', async (e) => {
+        form.addEventListener('submit', (e) => {
           e.preventDefault();
           
-          const lineId = document.getElementById('lineId').value.trim();
           const userId = document.getElementById('userId').value.trim();
           const userName = document.getElementById('userName').value.trim();
 
-          if (!lineId || !userId || !userName) {
+          if (!userId || !userName) {
             alert('全ての項目を入力してください');
             return;
           }
 
           // URL生成
           const url = baseUrl + '?' + 
-            'lineId=' + encodeURIComponent(lineId) +
-            '&userId=' + encodeURIComponent(userId) +
+            'userId=' + encodeURIComponent(userId) +
             '&userName=' + encodeURIComponent(userName);
+
+          // 既存のQRコードをクリア
+          const canvas = document.getElementById('canvas');
+          if (canvas) {
+            canvas.innerHTML = '';
+          }
 
           // QRコード生成
           try {
-            await QRCode.toCanvas(canvas, url, {
+            qrCodeInstance = new QRCode(document.getElementById('canvas'), {
+              text: url,
               width: 300,
-              margin: 2,
-              color: {
-                dark: '#000000',
-                light: '#ffffff'
-              }
+              height: 300,
+              colorDark: '#000000',
+              colorLight: '#ffffff',
+              correctLevel: QRCode.CorrectLevel.H
             });
 
             urlDisplay.textContent = url;
             qrcodeDiv.classList.add('show');
           } catch (error) {
             console.error('QRコード生成エラー:', error);
-            alert('QRコードの生成に失敗しました');
+            alert('QRコードの生成に失敗しました: ' + error.message);
           }
         });
 
         function downloadQR() {
-          const link = document.createElement('a');
+          const canvas = document.querySelector('#canvas canvas');
+          if (!canvas) {
+            alert('QRコードが生成されていません');
+            return;
+          }
+
           const userId = document.getElementById('userId').value.trim();
           const userName = document.getElementById('userName').value.trim();
           
+          const link = document.createElement('a');
           link.download = 'QR_' + userId + '_' + userName + '.png';
-          link.href = canvas.toDataURL();
+          link.href = canvas.toDataURL('image/png');
           link.click();
         }
       </script>
